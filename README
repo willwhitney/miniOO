@@ -1,0 +1,6 @@
+The file "calculator" can be compiled using gmake (under tcsh)
+% make delete
+% script
+% make
+% ^D
+% make delete
