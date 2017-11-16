@@ -1,6 +1,8 @@
 all:
 	@echo "Making all."
 	@make delete
+	@ocamlc -c ast.ml
+	@ocamlc -c scope.ml
 	@ocamllex calculatorLEX.mll
 	@menhir calculatorMENHIR.mly
 	@# ocamlyacc calculatorMENHIR.mly
@@ -8,8 +10,9 @@ all:
 	@ocamlc -c calculatorLEX.ml
 	@ocamlc -c calculatorMENHIR.ml
 	@ocamlc -c calculator.ml
-	@ocamlc -o calculator calculatorLEX.cmo calculatorMENHIR.cmo calculator.cmo
+	@ocamlc -o calculator ast.cmo scope.cmo calculatorLEX.cmo calculatorMENHIR.cmo calculator.cmo
 	@echo "Completed compilation."
+	@echo "var X; {X=1; var X; X=1}" | ./calculator
 
 # build-and-notify:
 # 	-@make all
@@ -21,5 +24,5 @@ delete:
 
 watch:
 	@make all
-	@fswatch --event=Updated "calculatorMENHIR.mly" \
+	@fswatch --event=Updated "calculatorMENHIR.mly" "scope.ml" "ast.ml" \
 		| xargs -I XXX make all

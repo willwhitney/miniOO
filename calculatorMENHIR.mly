@@ -1,7 +1,30 @@
 /* File calculatorMENHIR.mly */
 
 %{ (* header *)
+(*
 type symbTable = (string * int) list ;;
+let sb = ref([] : symbTable) ;;
+
+let getvalue x =
+   if (List.mem_assoc x !sb) then
+     (List.assoc x !sb)
+   else
+     0;;
+
+let rec except x l = match l with
+  []   -> []
+| h::t -> if (h = x) then t
+            else h::(except x t)
+
+let setvalue x v =
+  (print_string (x ^ " = "); print_int (v);
+   print_string ";\n"; flush stdout;
+   if (List.mem_assoc x !sb) then
+     sb := (x, v) :: (except (x, (List.assoc x !sb)) !sb)
+   else
+     sb := (x, v) :: !sb
+  );;
+*)
 
 (*
 type varType = Var of string
@@ -86,68 +109,105 @@ and procNode = Node of varNode * cmdNode
 ;;
 *)
 
-
-type cmdNode = Empty
-  | ScopeNode of varNode * cmdNode
-  | CallNode of exprNode * exprNode
-  | MallocNode of varNode
-  | VarAssignNode of varNode * exprNode
-  | FieldAssignNode of fieldNode * exprNode
-  | SkipNode
-  | SeqNode of cmdNode * cmdNode
-  | WhileNode of boolNode * cmdNode
-  | CondNode of boolNode * cmdNode * cmdNode
-  | ParallelNode of cmdNode * cmdNode
-  | AtomNode of cmdNode
-and exprNode =
-    NumNode of int
-  | ArithNode of arithNode
-  | NullNode
-  | VarAccessNode of varNode
-  | FieldAccessNode of exprNode * exprNode
-  | ProcNode of varNode * cmdNode
-and arithNode =
-    PlusNode of exprNode * exprNode
-  | MinusNode of exprNode * exprNode
-  | TimesNode of exprNode * exprNode
-  | DivNode of exprNode * exprNode
-and varNode = VarNode of string
-and fieldNode = FieldNode of string
-and boolNode =
-    TrueNode
-  | FalseNode
-  | GreaterNode of exprNode * exprNode
-  | GreaterEqualNode of exprNode * exprNode
-  | EqualNode of exprNode * exprNode
-  | LessEqualNode of exprNode * exprNode
-  | LessNode of exprNode * exprNode
-;;
-
+open Ast;;
+open Scope;;
 
 let printflush_int i = print_int (i); print_string "\n"; flush stdout;;
 let printflush_str s = print_string (s); print_string "\n"; flush stdout;;
 
-let sb = ref([] : symbTable) ;;
+let rec tabs n =
+  if n > 0 then
+    "|" ^ "   " ^ (tabs (n-1))
+  else ""
 
-let getvalue x =
-   if (List.mem_assoc x !sb) then
-     (List.assoc x !sb)
-   else
-     0;;
+let header s n =
+  (tabs n) ^ s ^ "\n"
 
-let rec except x l = match l with
-  []   -> []
-| h::t -> if (h = x) then t
-            else h::(except x t)
+let clear s =
+  s ^ "\n"
 
-let setvalue x v =
-  (print_string (x ^ " = "); print_int (v);
-   print_string ";\n"; flush stdout;
-   if (List.mem_assoc x !sb) then
-     sb := (x, v) :: (except (x, (List.assoc x !sb)) !sb)
-   else
-     sb := (x, v) :: !sb
-  );;
+let rec cmd_name node level =
+  let nlevel = level + 1 in
+  match node with
+  | Empty ->
+      (tabs level) ^ (clear ("Empty"))
+  | ScopeNode ((VarNode s), cmd) ->
+      (header ("Scope: variable " ^ s) level) ^ (cmd_name cmd nlevel)
+  | CallNode (e1, e2) ->
+      (header "Call" level) ^ (expr_name e1 nlevel) ^ (expr_name e2 nlevel)
+  | MallocNode (var) ->
+      (header "Malloc" level) ^ (var_name var nlevel)
+  | VarAssignNode (var, expr) ->
+      (header "VarAssign" level) ^ (var_name var nlevel) ^ (expr_name expr nlevel)
+  | FieldAssignNode (e1, e2, e3) ->
+      (header "FieldAssign" level) ^
+      (expr_name e1 nlevel) ^ (expr_name e2 nlevel) ^ (expr_name e3 nlevel)
+  | SkipNode ->
+      (tabs level) ^ (clear ("Skip"))
+  | SeqNode (c1, c2) ->
+      (header "Seq" level) ^ (cmd_name c1 nlevel) ^ (cmd_name c2 nlevel)
+  | WhileNode (boolean, cmd) ->
+      (header "While" level) ^ (bool_name boolean nlevel) ^ (cmd_name cmd nlevel)
+  | CondNode (boolean, c1, c2) ->
+      (header "Cond" level) ^ (bool_name boolean nlevel) ^ (cmd_name c1 nlevel) ^ (cmd_name c2 nlevel)
+  | ParallelNode (c1, c2) ->
+      (header "Parallel" level) ^ (cmd_name c1 nlevel) ^ (cmd_name c2 nlevel)
+  | AtomNode (cmd) ->
+      (header "Atom" level) ^ (cmd_name cmd nlevel)
+
+and expr_name node level =
+  let nlevel = level + 1 in
+  match node with
+  | NumNode num ->
+      (tabs level) ^ (clear ("Num: " ^ (string_of_int num)))
+  | MinusNode (e1, e2) ->
+      (header "Minus" level) ^ (expr_name e1 nlevel) ^ (expr_name e2 nlevel)
+  | NullNode ->
+      (tabs level) ^ (clear ("Null"))
+  | VarAccessNode (var) ->
+      (header "VarAccess" level) ^ (var_name var nlevel)
+  | FieldLiteralNode (field) ->
+      (header "FieldLiteral" level) ^ (field_name field nlevel)
+  | FieldAccessNode (e1, e2) ->
+      (header "FieldAccess" level) ^ (expr_name e1 nlevel) ^ (expr_name e2 nlevel)
+  | ProcNode (var, cmd) ->
+      (header "Proc" level) ^ (var_name var nlevel) ^ (cmd_name cmd nlevel)
+
+and var_name node level =
+  match node with
+  | VarNode s ->
+      (tabs level) ^ (clear ("Variable: " ^ s))
+
+and field_name node level =
+  match node with
+  | FieldNode s ->
+      (tabs level) ^ (clear ("Field: " ^ s))
+
+and bool_name node level =
+  let nlevel = level + 1 in
+  match node with
+  | TrueNode ->
+      (tabs level) ^ (clear "True")
+  | FalseNode ->
+      (tabs level) ^ (clear "False")
+  | LessNode (e1, e2) ->
+      (header "Less" level) ^ (expr_name e1 nlevel) ^ (expr_name e2 nlevel)
+
+let print_tree cmd =
+  printflush_str (cmd_name cmd 0)
+
+
+(*
+
+printflush_str ("not found: " ^ var);
+
+*)
+
+
+
+let run_program cmd =
+  print_tree (Scope.scope_cmd cmd [])
+
 
 %} /* declarations */
 
@@ -168,91 +228,63 @@ let setvalue x v =
 /*%type <boolType> bool*/
 /*%type <exprType> expr*/
 
+%left ASSIGN
 %left PLUS MINUS          /* lowest precedence  */
 %left TIMES DIV           /* medium precedence  */
+%left DOT
 %nonassoc UMINUS          /* highest precedence */
 
 %% /* rules */
 
 prog :
-    cmd EOL     { printflush_str "cmd" }
-  | expr EOL     { printflush_str "expr" }
-  | boolean EOL     { printflush_str "boolean" }
-  | arithmetic EOL  {printflush_str "arithmetic"}
+    cmd EOL     { run_program $1 }
+  | expr EOL     { printflush_str (expr_name $1 0) }
+  | boolean EOL     { printflush_str (bool_name $1 0) }
 
-
-/*arithmetic :
-    ONE MINUS ONE { MinusNode (1, 1) }
-  | ONE PLUS ONE { PlusNode (1, 1) }
-  | ONE TIMES ONE { TimesNode (1, 1) }
-  | ONE DIV ONE { DivNode (1, 1) }*/
-
-/*arithmetic :
+minus :
     e1=expr MINUS e2=expr { MinusNode (e1, e2) }
-  | e1=expr PLUS e2=expr { PlusNode (e1, e2) }
-  | e1=expr TIMES e2=expr { TimesNode (e1, e2) }
-  | e1=expr DIV e2=expr { DivNode (e1, e2) }*/
-
-arithmetic :
-    e1=expr MINUS e2=expr { ArithNode (MinusNode (e1, e2)) }
-  | e1=expr PLUS e2=expr { ArithNode (PlusNode (e1, e2)) }
-  | e1=expr TIMES e2=expr { ArithNode (TimesNode (e1, e2)) }
-  | e1=expr DIV e2=expr { ArithNode (DivNode (e1, e2)) }
-
-/*expr :
-    ONE {printflush_str "one"; NumNode 1}
-  | arithmetic { ArithNode $1}*/
 
 expr :
-    FIELD { FieldNode $1 }
-  | VAR { VarNode $1 }
+    FIELD { FieldLiteralNode (FieldNode $1) }
+  | VAR { VarAccessNode (VarNode $1) }
   | ONE { NumNode 1 }
   | NULL { NullNode }
-  | arithmetic { ArithNode $1 }
-  | expr DOT expr { VarAccessNode ($1, $3) }
-  | PROC v=VAR COLON c=cmd { ProcNode (v, c) }
-
-/*varDecl :
-    VARDEC v=VAR  { D}*/
-
-comparison :
-    expr LT expr {printflush_str "lt"}
-  | expr LEQ expr {printflush_str "leq"}
-  | expr EQ expr {printflush_str "eq"}
-  | expr GEQ expr {printflush_str "geq"}
-  | expr GT expr {printflush_str "gt"}
+  | minus { $1 }
+  | expr DOT expr { FieldAccessNode ($1, $3) }
+  | PROC v=VAR COLON c=cmd { ProcNode (VarNode v, c) }
 
 boolean :
-    TRUE {printflush_str "true"}
-  | FALSE {printflush_str "false"}
-  | comparison {printflush_str "comparison"}
+    TRUE { TrueNode }
+  | FALSE { FalseNode}
+  | expr LT expr { LessNode ($1, $3) }
 
 parallel :
-    LBRACKET cmd PARALLEL cmd RBRACKET {printflush_str "parallel"}
+    LBRACKET cmd PARALLEL cmd RBRACKET { ParallelNode ($2, $4) }
 
 conditional :
-    IF boolean cmd ELSE cmd {printflush_str "cond"}
+    IF boolean cmd ELSE cmd { CondNode ($2, $3, $5) }
 
 loop :
-    WHILE boolean cmd {printflush_str "while"}
+    WHILE boolean cmd { WhileNode ($2, $3) }
 
 cmdSequence :
-    LBRACKET cmd SEMICOLON cmd RBRACKET {printflush_str "cmd seq"}
+    LBRACKET cmd SEMICOLON cmd RBRACKET { SeqNode ($2, $4)}
 
 call :
-    expr LPAREN expr RPAREN {printflush_str "call"}
+    expr LPAREN expr RPAREN { CallNode ($1, $3)}
+
 
 cmd :
-    VARDEC v=VAR SEMICOLON c=cmd { ScopeNode (v, c) }
-  | call {}
-  | MALLOC LPAREN VAR RPAREN {printflush_str "malloc"}
-  | VAR ASSIGN expr {printflush_str "assign"}
-  | expr DOT expr {printflush_str "field access"}
-  | SKIP {printflush_str "skip"}
-  | cmdSequence {}
-  | loop {}
-  | conditional {}
-  | parallel {}
-  | ATOM LPAREN cmd RPAREN {printflush_str "atom"}
+    VARDEC v=VAR SEMICOLON c=cmd {ScopeNode (VarNode v, c) }
+  | call { $1 }
+  | MALLOC LPAREN VAR RPAREN { MallocNode (VarNode $3) }
+  | VAR ASSIGN expr { VarAssignNode (VarNode $1, $3) }
+  | expr DOT expr ASSIGN expr { FieldAssignNode ($1, $3, $5) }
+  | SKIP { SkipNode }
+  | cmdSequence { $1 }
+  | loop { $1 }
+  | conditional { $1 }
+  | parallel { $1 }
+  | ATOM LPAREN cmd RPAREN { AtomNode $3 }
 
 %% (* trailer *)
