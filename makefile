@@ -13,6 +13,7 @@ all:
 	@ocamlc -o calculator ast.cmo scope.cmo calculatorLEX.cmo calculatorMENHIR.cmo calculator.cmo
 	@echo "Completed compilation."
 	@echo "var X; {X=1; var X; X=1}" | ./calculator
+	@echo "var X; {var X; X = proc Y: X=Y; X=1 }" | ./calculator
 
 # build-and-notify:
 # 	-@make all

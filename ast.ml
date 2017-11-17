@@ -1,5 +1,6 @@
+(* static domains *)
 type cmdNode = Empty
-  | ScopeNode of varNode * cmdNode
+  | VardecNode of varNode * cmdNode
   | CallNode of exprNode * exprNode
   | MallocNode of varNode
   | VarAssignNode of varNode * exprNode
@@ -25,3 +26,44 @@ and boolNode =
   | FalseNode
   | LessNode of exprNode * exprNode
 ;;
+
+(* Semantic domains *)
+type boolType =
+  | True
+  | False
+  | BoolError
+and objType =
+    Object of int
+and locType =
+  | ObjLoc of objType
+  | NullLoc
+and closureType =
+  | Closure of varNode * controlType * stackType
+and valType =
+  | FieldVal of fieldNode
+  | IntVal of int
+  | LocVal of locType
+  | CloVal of closureType
+  | NullVal
+and tvalType =
+  | Value of valType
+  | ValueError
+and envType =
+    Environment of varNode * objType
+and frameType =
+  | DeclFrame of envType
+  | CallFrame of envType * stackType
+and stackType =
+    Stack of frameType list
+and heapType =
+  (* | Heap of ((objType * fieldNode) * tvalType) list *)
+  Heap of ((objType * fieldNode),  tvalType) Hashtbl.t
+and stateType =
+  | State of stackType * heapType
+and controlType =
+  | CmdCtrl of cmdNode
+  | BlockCtrl of controlType
+and configType =
+  | Nonterminal of controlType * stateType
+  | Terminal of stateType
+  | ConfigError

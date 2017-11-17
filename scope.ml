@@ -18,19 +18,22 @@ let create_var name scope =
 let rec scope_cmd cmd scope =
 match cmd with
 | Empty -> Empty
-| ScopeNode ((VarNode var), cmd) ->
+| VardecNode ((VarNode var), cmd) ->
     let (new_var, new_scope) = create_var var scope in
     let scoped_cmd = (scope_cmd cmd new_scope) in
-    ScopeNode ((VarNode new_var), scoped_cmd)
+    VardecNode ((VarNode new_var), scoped_cmd)
 | CallNode (e1, e2) -> CallNode ((scope_expr e1 scope), (scope_expr e2 scope))
 | MallocNode (var) -> MallocNode (scope_var var scope)
 | VarAssignNode (var, expr) ->
     VarAssignNode ((scope_var var scope), (scope_expr expr scope))
 | FieldAssignNode (e1, e2, e3) ->
-    FieldAssignNode ((scope_expr e1 scope), (scope_expr e2 scope), (scope_expr e3 scope))
+    FieldAssignNode ((scope_expr e1 scope),
+                     (scope_expr e2 scope),
+                     (scope_expr e3 scope))
 | SkipNode -> SkipNode
 | SeqNode (c1, c2) -> SeqNode (scope_cmd c1 scope, scope_cmd c2 scope)
-| WhileNode (boolean, cmd) -> WhileNode (scope_bool boolean scope, scope_cmd cmd scope)
+| WhileNode (boolean, cmd) ->
+    WhileNode (scope_bool boolean scope, scope_cmd cmd scope)
 | CondNode (boolean, c1, c2) ->
     CondNode (scope_bool boolean scope, scope_cmd c1 scope, scope_cmd c2 scope)
 | ParallelNode (c1, c2) -> ParallelNode (scope_cmd c1 scope, scope_cmd c2 scope)
