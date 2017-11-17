@@ -37,13 +37,11 @@ and objType =
 and locType =
   | ObjLoc of objType
   | NullLoc
-and closureType =
-  | Closure of varNode * controlType * stackType
 and valType =
   | FieldVal of fieldNode
   | IntVal of int
   | LocVal of locType
-  | CloVal of closureType
+  | Closure of varNode * controlType * stackType
   | NullVal
 and tvalType =
   | Value of valType

@@ -291,13 +291,8 @@ and step ctrl state =
         let e1_value = eval_expr e1 state in
         let param_value = eval_expr e2 state in
         begin match e1_value with
-        | Value (CloVal (Closure (param, closure_ctrl, closure_stack))) ->
-        (*
-        | Value (closureValue) ->
-            match closureValue with CloVal (closure) ->
-            match closure with Closure (param, closure_ctrl, closure_stack) ->
-            *)
-            (*(CloVal (Closure (param, closure_ctrl, closure_stack)))*)
+        (* good lord closures need a lot of unwrapping *)
+        | Value (Closure (param, closure_ctrl, closure_stack)) ->
             let new_loc = Object (create_heaploc ()) in
             (* Add a new frame to the stack that holds a mapping from the
                formal parameter to a new address in the heap *)
@@ -401,7 +396,7 @@ and eval_expr expr state =
       end
   | ProcNode (var, cmd) ->
       let closure = Closure (var, CmdCtrl cmd, stack) in
-      Value (CloVal closure)
+      Value closure
 and eval_bool boolean state =
   match boolean with
   | TrueNode -> True
