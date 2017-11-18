@@ -42,10 +42,10 @@ and valType =
   | IntVal of int
   | LocVal of locType
   | Closure of varNode * controlType * stackType
-  | NullVal
+  (* | NullVal *)
 and tvalType =
   | Value of valType
-  | ValueError
+  | ValueError of string
 and envType =
     Environment of varNode * objType
 and frameType =
@@ -64,4 +64,4 @@ and controlType =
 and configType =
   | Nonterminal of controlType * stateType
   | Terminal of stateType
-  | ConfigError
+  | ConfigError of string

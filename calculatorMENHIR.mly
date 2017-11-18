@@ -17,6 +17,8 @@ let create_heaploc () =
   heap_counter := !heap_counter + 1;
   new_loc
 
+let allocated_vars = Hashtbl.create 100
+
 let rec step ctrl state =
   let (stack, heap) = unwrap_state state in
   let heap_table = unwrap_heap heap in
@@ -28,9 +30,9 @@ let rec step ctrl state =
         let new_loc = Object (create_heaploc ()) in
         let new_frame = DeclFrame (Environment (var, new_loc)) in
         let new_stack = prepend_frame new_frame stack in
-        let new_heap_pair = (new_loc, FieldNode "val") in
+        let val_address = (new_loc, FieldNode "val") in
         let new_heap_entry = Value (LocVal NullLoc) in
-        Hashtbl.replace heap_table new_heap_pair new_heap_entry;
+        Hashtbl.replace heap_table val_address new_heap_entry;
         Nonterminal (CmdCtrl cmd, State (new_stack, heap))
     | CallNode (e1, e2) ->
         let e1_value = eval_expr e1 state in
@@ -44,32 +46,64 @@ let rec step ctrl state =
             let param_env = Environment (param, new_loc) in
             let param_frame = CallFrame (param_env, stack) in
             let closure_stack = prepend_frame param_frame closure_stack in
-            let param_value_address = (new_loc, FieldNode "val") in
+            let param_val_address = (new_loc, FieldNode "val") in
             (* writes the value of the parameter its heap address *)
-            Hashtbl.replace heap_table param_value_address param_value;
+            Hashtbl.replace heap_table param_val_address param_value;
             let closure_state = State (closure_stack, heap) in
             step (BlockCtrl closure_ctrl) closure_state
-        | _ -> ConfigError
+        | ValueError s ->
+            let errmsg = "e1 was not a value in CallNode: " ^ s in
+            ConfigError errmsg
+        | _ -> ConfigError "e1 was not a closure in CallNode"
         end
     | MallocNode (var) ->
-        printflush_str "Terminating early due to not implemented: MallocNode";
+        let loc = get_var_location stack var in
+        let new_heap_loc_obj = Object (create_heaploc ()) in
+        let new_heap_loc_val = Value (LocVal (ObjLoc new_heap_loc_obj)) in
+        let val_address = (loc, FieldNode "val") in
+        Hashtbl.replace allocated_vars new_heap_loc_obj true;
+        Hashtbl.replace heap_table val_address new_heap_loc_val;
         Terminal state
     | VarAssignNode (var, expr) ->
         let expr_value = eval_expr expr state in
         begin match expr_value with
         | Value v ->
             let loc = get_var_location stack var in
-            let address = (loc, FieldNode "val") in
-            Hashtbl.replace heap_table address expr_value;
+            let val_address = (loc, FieldNode "val") in
+            Hashtbl.replace heap_table val_address expr_value;
             Terminal (State (stack, heap))
-        | _ -> ConfigError
+        | ValueError s ->
+            let errmsg = "expr was not a value in VarAssign: " ^ s in
+            ConfigError errmsg
         end
 
     | FieldAssignNode (e1, e2, e3) ->
-        printflush_str "Terminating early due to not implemented: FieldAssignNode";
-        Terminal state
+        let e1_value = eval_expr e1 state in
+        let e2_value = eval_expr e2 state in
+        let e3_value = eval_expr e3 state in
+        begin match e1_value with
+        | Value (LocVal (ObjLoc l)) ->
+          if Hashtbl.mem allocated_vars l then
+            begin match e2_value with
+            | Value (FieldVal f) ->
+                let address = (l, f) in
+                Hashtbl.replace heap_table address e3_value;
+                Terminal state
+            | ValueError s ->
+                let errmsg = "field in FieldAssign was not a value:\n" ^ s in
+                ConfigError errmsg
+            | _ -> ConfigError "field in FieldAssign was not a field type"
+            end
+          else
+            let errmsg = Printf.sprintf "%s has not been allocated before field assignment" (obj_name l) in
+            ConfigError errmsg
+        | ValueError s ->
+            let errmsg = "Location in FieldAssign was not a value: " ^ s in
+            ConfigError errmsg
+        | _ -> ConfigError "location in FieldAssign was not a location type"
+        end
+
     | SkipNode ->
-        printflush_str "Terminating early due to not implemented: SkipNode";
         Terminal state
     | SeqNode (c1, c2) ->
         let after_c1_state = iterator (Nonterminal (CmdCtrl c1, state)) in
@@ -94,9 +128,6 @@ let rec step ctrl state =
     | AtomNode (cmd) ->
         printflush_str "Terminating early due to not implemented: AtomNode";
         Terminal state
-    | _ ->
-        printflush_str "Terminating prematurely due to unimplemented cmd case.";
-        Terminal state
     end
   | BlockCtrl blocked_ctrl ->
     let next_config = step blocked_ctrl state in
@@ -115,7 +146,7 @@ let rec step ctrl state =
           end
       | _ -> failwith "Tried to pop empty stack."
       end
-    | ConfigError -> ConfigError
+    | ConfigError s -> ConfigError s
     end
 
 and eval_expr expr state =
@@ -132,11 +163,17 @@ and eval_expr expr state =
           | Value (IntVal num2) ->
               let result = num1 - num2 in
               Value (IntVal result)
-          | _ -> ValueError
+          | ValueError s ->
+              let errmsg = "Second argument of minus was not a value:\n" ^ s in
+              ValueError errmsg
+          | _ -> ValueError "e2 was not an int in minus"
           end
-      | _ -> ValueError
+      | ValueError s ->
+        let errmsg = "First arg of minus was not a value:\n" ^ s in
+        ValueError errmsg
+      | _ -> ValueError "e1 was not an int in minus"
       end
-  | NullNode -> Value NullVal
+  | NullNode -> Value (LocVal NullLoc)
   | VarAccessNode var ->
       let var_loc = get_var_location stack var in
       Hashtbl.find heap_table (var_loc, FieldNode "val")
@@ -146,14 +183,27 @@ and eval_expr expr state =
       let field = eval_expr e2 state in
       begin match loc with
       | Value (LocVal (ObjLoc l)) ->
-          begin match field with
-          | Value (FieldVal f) ->
-              if Hashtbl.mem heap_table (l, f) then
-                Hashtbl.find heap_table (l, f)
-              else ValueError
-          | _ -> ValueError
-          end
-      | _ -> ValueError
+          if Hashtbl.mem allocated_vars l then
+            begin match field with
+            | Value (FieldVal f) ->
+                if Hashtbl.mem heap_table (l, f) then
+                  Hashtbl.find heap_table (l, f)
+                else
+                  Value (LocVal NullLoc)
+                  (*let errmsg = Printf.sprintf "Address (%s, %s) did not exist on the heap (@FieldAccess)" (obj_name l) (field_name f) in
+                  ValueError errmsg*)
+            | ValueError s ->
+                let errmsg = "field in FieldAccess was not a value:\n" ^ s in
+                ValueError errmsg
+            | _ -> ValueError "field in FieldAccess was not a field type"
+            end
+          else
+            ValueError ("Variable " ^ (obj_name l) ^
+                        " was not malloc'd before FieldAccess")
+      | ValueError s ->
+          let errmsg = "Location in FieldAccess was not a value: " ^ s in
+          ValueError errmsg
+      | _ -> ValueError "location in FieldAccess was not a location type"
       end
   | ProcNode (var, cmd) ->
       let closure = Closure (var, CmdCtrl cmd, stack) in
@@ -189,6 +239,7 @@ and iterator config =
       printflush_str (stack_name stack 0);
       printflush_str "Heap:";
       printflush_str (heap_name heap);
+      printflush_str ("Allocated: " ^ (allocateds_name allocated_vars));
       iterator (step ctrl state)
   | Terminal (State (stack, heap)) ->
       printflush_str "==================================";
@@ -197,9 +248,10 @@ and iterator config =
       printflush_str (stack_name stack 0);
       printflush_str "Heap:";
       printflush_str (heap_name heap);
+      printflush_str ("Allocated: " ^ (allocateds_name allocated_vars));
       printflush_str "";
       State (stack, heap)
-  | ConfigError -> failwith "Error propagated up to iterator"
+  | ConfigError s -> failwith ("Error propagated up to iterator:\n" ^ s)
 
 
 (*

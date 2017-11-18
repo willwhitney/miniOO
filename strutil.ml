@@ -140,9 +140,16 @@ and val_name value =
       let ctrl_str = ctrl_name ctrl 3 in
       let stack_str = stack_name stack 3 in
       Printf.sprintf "\n    Closure: \n\tVar: %s, \n\tCtrl:\n%s \tStack:\n%s" var_str ctrl_str stack_str
-  | Value NullVal -> "NullVal"
-  | ValueError -> "ValueError"
+  (* | Value NullVal -> "NullVal" *)
+  | ValueError s -> "ValueError: " ^ s
 and ctrl_name ctrl level =
   match ctrl with
   | CmdCtrl cmd -> (tabs level) ^ ("CmdCtrl: \n" ^ (cmd_tree cmd (level + 1)))
   | BlockCtrl ctrl -> "BlockCtrl: \n" ^ (ctrl_name ctrl (level + 1))
+
+and allocateds_name allocated =
+  Hashtbl.fold allocated_name_reducer allocated ""
+and allocated_name_reducer k v acc =
+  acc ^ "[" ^ (obj_name k) ^ "] "
+(* and allocated_element_name (Object num) = *)
+  (* string_of_int num *)
