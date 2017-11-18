@@ -1,4 +1,5 @@
-open Ast;;
+
+open Ast
 
 let var_counts = Hashtbl.create 100;;
 
