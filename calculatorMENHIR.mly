@@ -26,6 +26,7 @@ let rec step ctrl state =
   | CmdCtrl cmd ->
     begin match cmd with
     | Empty -> Terminal state
+
     | VardecNode (var, cmd) ->
         let new_loc = Object (create_heaploc ()) in
         let new_frame = DeclFrame (Environment (var, new_loc)) in
@@ -34,6 +35,7 @@ let rec step ctrl state =
         let new_heap_entry = Value (LocVal NullLoc) in
         Hashtbl.replace heap_table val_address new_heap_entry;
         Nonterminal (CmdCtrl cmd, State (new_stack, heap))
+
     | CallNode (e1, e2) ->
         let e1_value = eval_expr e1 state in
         let param_value = eval_expr e2 state in
@@ -56,6 +58,7 @@ let rec step ctrl state =
             ConfigError errmsg
         | _ -> ConfigError "e1 was not a closure in CallNode"
         end
+
     | MallocNode (var) ->
         let loc = get_var_location stack var in
         let new_heap_loc_obj = Object (create_heaploc ()) in
@@ -64,6 +67,7 @@ let rec step ctrl state =
         Hashtbl.replace allocated_vars new_heap_loc_obj true;
         Hashtbl.replace heap_table val_address new_heap_loc_val;
         Terminal state
+
     | VarAssignNode (var, expr) ->
         let expr_value = eval_expr expr state in
         begin match expr_value with
@@ -105,9 +109,11 @@ let rec step ctrl state =
 
     | SkipNode ->
         Terminal state
+
     | SeqNode (c1, c2) ->
         let after_c1_state = iterator (Nonterminal (CmdCtrl c1, state)) in
         Nonterminal (CmdCtrl c2, after_c1_state)
+
     (* represent While (boolean, cmd) with a transformation into:
         if boolean:
           cmd;
@@ -134,11 +140,11 @@ let rec step ctrl state =
         end
 
     | ParallelNode (c1, c2) ->
-        printflush_str "Terminating early due to not implemented: ParallelNode";
-        Terminal state
+        Nonterminal (CmdCtrl (SeqNode (c1, c2)), state)
+
     | AtomNode (cmd) ->
-        printflush_str "Terminating early due to not implemented: AtomNode";
-        Terminal state
+        Terminal (iterator (Nonterminal (CmdCtrl cmd, state)))
+
     end
   | BlockCtrl blocked_ctrl ->
     let next_config = step blocked_ctrl state in
