@@ -108,20 +108,31 @@ let rec step ctrl state =
     | SeqNode (c1, c2) ->
         let after_c1_state = iterator (Nonterminal (CmdCtrl c1, state)) in
         Nonterminal (CmdCtrl c2, after_c1_state)
-        (*
-        let next_config = step c1 state in
-        begin match next_config with
-        | Terminal state -> Nonterminal (c2, state)
-        | Nonterminal (next_ctrl, state) ->
-            let new_seq = SeqNode (next)
-        end
-        *)
+    (* represent While (boolean, cmd) with a transformation into:
+        if boolean:
+          cmd;
+          while boolean:
+            cmd;
+        else:
+          empty
+    *)
     | WhileNode (boolean, cmd) ->
-        printflush_str "Terminating early due to not implemented: WhileNode";
-        Terminal state
+        let true_cmd_step = cmd in
+        let true_cmd_repeat = WhileNode (boolean, cmd) in
+        let true_cmd = SeqNode (true_cmd_step, true_cmd_repeat) in
+        let false_cmd = Empty in
+        let cond_cmd = CondNode (boolean, true_cmd, false_cmd) in
+        Nonterminal (CmdCtrl cond_cmd, state)
+
     | CondNode (boolean, c1, c2) ->
-        printflush_str "Terminating early due to not implemented: CondNode";
-        Terminal state
+        let bool_val = eval_bool boolean state in
+        begin match bool_val with
+        | True -> Nonterminal (CmdCtrl c1, state)
+        | False -> Nonterminal (CmdCtrl c2, state)
+        | BoolError s ->
+            ConfigError ("Boolean in CondNode was error: " ^ s)
+        end
+
     | ParallelNode (c1, c2) ->
         printflush_str "Terminating early due to not implemented: ParallelNode";
         Terminal state
@@ -221,9 +232,11 @@ and eval_bool boolean state =
           | Value (IntVal num2) ->
               if num1 < num2 then True
               else False
-          | _ -> BoolError
+          | ValueError s -> BoolError ("Number 2 in LessNode was error: " ^ s)
+          | _ -> BoolError ("Number 2 in LessNode was not an IntVal")
           end
-      | _ -> BoolError
+      | ValueError s -> BoolError ("Number 1 in LessNode was error: " ^ s)
+      | _ -> BoolError ("Number 1 in LessNode was not an IntVal")
       end
 
 

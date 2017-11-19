@@ -31,7 +31,7 @@ and boolNode =
 type boolType =
   | True
   | False
-  | BoolError
+  | BoolError of string
 and objType =
     Object of int
 and locType =
