@@ -36,7 +36,7 @@ rule token = parse
   | "proc"     { PROC }
   | "null"     { NULL }
   | '|' '|' '|'   { PARALLEL }
-  | (['A'-'Z'])(['a'-'z'] | ['A'-'Z'] | ['0'-'9'])* as var
+  | (['A'-'Z'])(['a'-'z'] | ['A'-'Z'])* as var
   { VAR var }
   | (['a'-'z'])(['a'-'z'] | ['A'-'Z'] | ['0'-'9'])* as field
   { FIELD field }

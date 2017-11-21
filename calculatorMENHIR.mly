@@ -54,7 +54,7 @@ let rec step ctrl state =
             let closure_state = State (closure_stack, heap) in
             step (BlockCtrl closure_ctrl) closure_state
         | ValueError s ->
-            let errmsg = "e1 was not a value in CallNode: " ^ s in
+            let errmsg = "e1 was not a value in CallNode:\n" ^ s in
             ConfigError errmsg
         | _ -> ConfigError "e1 was not a closure in CallNode"
         end
@@ -77,7 +77,7 @@ let rec step ctrl state =
             Hashtbl.replace heap_table val_address expr_value;
             Terminal (State (stack, heap))
         | ValueError s ->
-            let errmsg = "expr was not a value in VarAssign: " ^ s in
+            let errmsg = "expr was not a value in VarAssign:\n" ^ s in
             ConfigError errmsg
         end
 
@@ -102,7 +102,7 @@ let rec step ctrl state =
             let errmsg = Printf.sprintf "%s has not been allocated before field assignment" (obj_name l) in
             ConfigError errmsg
         | ValueError s ->
-            let errmsg = "Location in FieldAssign was not a value: " ^ s in
+            let errmsg = "Location in FieldAssign was not a value:\n" ^ s in
             ConfigError errmsg
         | _ -> ConfigError "location in FieldAssign was not a location type"
         end
@@ -136,7 +136,7 @@ let rec step ctrl state =
         | True -> Nonterminal (CmdCtrl c1, state)
         | False -> Nonterminal (CmdCtrl c2, state)
         | BoolError s ->
-            ConfigError ("Boolean in CondNode was error: " ^ s)
+            ConfigError ("Boolean in CondNode was error:\n" ^ s)
         end
 
     | ParallelNode (c1, c2) ->
@@ -218,7 +218,7 @@ and eval_expr expr state =
             ValueError ("Variable " ^ (obj_name l) ^
                         " was not malloc'd before FieldAccess")
       | ValueError s ->
-          let errmsg = "Location in FieldAccess was not a value: " ^ s in
+          let errmsg = "Location in FieldAccess was not a value:\n" ^ s in
           ValueError errmsg
       | _ -> ValueError "location in FieldAccess was not a location type"
       end
@@ -238,10 +238,10 @@ and eval_bool boolean state =
           | Value (IntVal num2) ->
               if num1 < num2 then True
               else False
-          | ValueError s -> BoolError ("Number 2 in LessNode was error: " ^ s)
+          | ValueError s -> BoolError ("Number 2 in LessNode was error:\n" ^ s)
           | _ -> BoolError ("Number 2 in LessNode was not an IntVal")
           end
-      | ValueError s -> BoolError ("Number 1 in LessNode was error: " ^ s)
+      | ValueError s -> BoolError ("Number 1 in LessNode was error:\n" ^ s)
       | _ -> BoolError ("Number 1 in LessNode was not an IntVal")
       end
 
